@@ -129,7 +129,7 @@ services:
         chmod -R 775 /opt/airflow/logs
 
         # Run Airflow commands as airflow user
-        su -s /bin/bash "${AIRFLOW_UID:-50000}" -c "
+        runuser -u "${AIRFLOW_UID:-50000}" -- bash -c "
           airflow db migrate &&
           airflow users create \
             --username airflow \
