@@ -2,26 +2,62 @@
 version: '3.8'
 
 services:
-  postgres:
+  airflow-metadata:
     image: postgres:13
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
+      - airflow-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 10s
+      interval: 5s
       retries: 5
-      start_period: 5s
     restart: always
 
-  airflow:
+  airflow-scheduler:
     image: ${AIRFLOW_IMAGE_NAME:-airflow_local:latest}
+    command: scheduler
     environment:
-      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-metadata/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__PARALLELISM: 1
+      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
+      AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: 1
+      OLLAMA_URL: "http://host.docker.internal:11434"
+      AWS_DEFAULT_REGION: eu-west-1
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - ~/.aws/:/home/airflow/.aws:ro
+    user: "${AIRFLOW_UID:-50000}:0"
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-metadata:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    restart: always
+
+  airflow-webserver:
+    image: ${AIRFLOW_IMAGE_NAME:-airflow_local:latest}
+    command: webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-metadata/airflow
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -42,6 +78,47 @@ services:
     user: "${AIRFLOW_UID:-50000}:0"
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-metadata:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    restart: always
+
+  airflow-init:
+    image: ${AIRFLOW_IMAGE_NAME:-airflow_local:latest}
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-metadata/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__PARALLELISM: 1
+      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
+      AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: 1
+      OLLAMA_URL: "http://host.docker.internal:11434"
+      AWS_DEFAULT_REGION: eu-west-1
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+      _AIRFLOW_WWW_USER_USERNAME: airflow
+      _AIRFLOW_WWW_USER_FIRSTNAME: Airflow
+      _AIRFLOW_WWW_USER_LASTNAME: User
+      _AIRFLOW_WWW_USER_EMAIL: admin@example.com
+      _AIRFLOW_WWW_USER_ROLE: Admin
+      _AIRFLOW_WWW_USER_PASSWORD: airflow
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - ~/.aws/:/home/airflow/.aws:ro
+    user: "${AIRFLOW_UID:-50000}:0"
     command: >
       bash -c "
         airflow db upgrade &&
@@ -52,13 +129,11 @@ services:
           --role Admin
           --email admin@example.com
           --password airflow
-        || true &&
-        airflow scheduler &
-        airflow webserver"
+        || true"
     depends_on:
-      postgres:
+      airflow-metadata:
         condition: service_healthy
-    restart: always
+    restart: "no"
 
 volumes:
-  postgres-db-volume:
+  airflow-db-data:
