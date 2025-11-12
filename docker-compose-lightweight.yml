@@ -128,17 +128,15 @@ services:
         chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow
         chmod -R 775 /opt/airflow/logs
 
-        # Run Airflow commands as airflow user
-        runuser -u "${AIRFLOW_UID:-50000}" -- bash -c "
-          airflow db migrate &&
-          airflow users create \
-            --username airflow \
-            --firstname Airflow \
-            --lastname User \
-            --role Admin \
-            --email admin@example.com \
-            --password airflow || true
-        "
+        # Run Airflow commands as root (init only)
+        airflow db migrate &&
+        airflow users create \
+          --username airflow \
+          --firstname Airflow \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password airflow || true
     depends_on:
       airflow-metadata:
         condition: service_healthy
