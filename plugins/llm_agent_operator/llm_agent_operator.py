@@ -1,4 +1,5 @@
 from airflow.models import BaseOperator
+from airflow.utils.log.logging_mixin import LoggingMixin
 from agno.agent import Agent
 from agno.models.ollama import Ollama
 
@@ -65,6 +66,8 @@ class LlmClothingAgentOperator(BaseOperator):
             "```"
         )
         response = agent.run(prompt)
+        print(response.content)
+        self.log.info(response.content)  # Better than print()
         return str(self.weather_conditions) + response.content
 
     def execute(self, context):
