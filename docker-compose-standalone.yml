@@ -5,8 +5,9 @@ services:
   airflow-standalone:
     image: apache/airflow:2.10.3
     environment:
+      # Updated to new database section
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:///opt/airflow/airflow.db
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: sqlite:///opt/airflow/airflow.db
       AIRFLOW__CORE__FERNET_KEY: 'b0lZvZ3hQc3h6Yl9hQmVrVHZJc0hXZ3lqTmFzY2VydG5lcg=='
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -22,13 +23,16 @@ services:
       - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
       - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
       - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-      - airflow-db:/opt/airflow
+      - ${AIRFLOW_PROJ_DIR:-.}/airflow.db:/opt/airflow/airflow.db
       - ~/.aws/:/home/airflow/.aws:ro
-    user: "${AIRFLOW_UID:-50000}:0"
+    # Use root user to fix permission issues on Raspberry Pi
+    user: "0:0"
     ports:
       - "8080:8080"
     command: >
       bash -c "
+        mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/task /opt/airflow/logs/dag_processor &&
+        chown -R airflow:airflow /opt/airflow &&
         airflow db init &&
         airflow users create
           --username airflow
@@ -38,8 +42,8 @@ services:
           --email admin@example.com
           --password airflow
         || true &&
-        airflow scheduler &
-        airflow webserver"
+        exec airflow scheduler &
+        exec airflow webserver"
     restart: always
 
 volumes:

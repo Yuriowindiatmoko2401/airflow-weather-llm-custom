@@ -63,3 +63,6 @@ class WeatherApiOperator(BaseOperator):
     def execute(self, context):
         forecast = self._get_weather_forecast()
         return forecast
+
+
+# if __name__
