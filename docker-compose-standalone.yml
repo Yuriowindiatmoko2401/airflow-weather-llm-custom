@@ -1,0 +1,46 @@
+---
+version: '3.8'
+
+services:
+  airflow-standalone:
+    image: apache/airflow:2.10.3
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: sqlite:///opt/airflow/airflow.db
+      AIRFLOW__CORE__FERNET_KEY: 'b0lZvZ3hQc3h6Yl9hQmVrVHZJc0hXZ3lqTmFzY2VydG5lcg=='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__PARALLELISM: 2
+      AIRFLOW__WEBSERVER__WEB_SERVER_PORT: 8080
+      OLLAMA_URL: "http://host.docker.internal:11434"
+      AWS_DEFAULT_REGION: eu-west-1
+      _PIP_ADDITIONAL_REQUIREMENTS: "requests psycopg2-binary"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - airflow-db:/opt/airflow
+      - ~/.aws/:/home/airflow/.aws:ro
+    user: "${AIRFLOW_UID:-50000}:0"
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create
+          --username airflow
+          --firstname Airflow
+          --lastname User
+          --role Admin
+          --email admin@example.com
+          --password airflow
+        || true &&
+        airflow scheduler &
+        airflow webserver"
+    restart: always
+
+volumes:
+  airflow-db:
