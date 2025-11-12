@@ -6,7 +6,7 @@ services:
     image: apache/airflow:2.10.3
     environment:
       # Updated to new database section
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:///opt/airflow/airflow.db
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__FERNET_KEY: 'b0lZvZ3hQc3h6Yl9hQmVrVHZJc0hXZ3lqTmFzY2VydG5lcg=='
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
