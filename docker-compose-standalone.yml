@@ -32,7 +32,9 @@ services:
     command: >
       bash -c "
         mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/task /opt/airflow/logs/dag_processor &&
+        touch /opt/airflow/airflow.db &&
         chown -R airflow:airflow /opt/airflow &&
+        chmod 664 /opt/airflow/airflow.db &&
         airflow db init &&
         airflow users create
           --username airflow
