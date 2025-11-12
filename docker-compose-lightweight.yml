@@ -128,8 +128,8 @@ services:
         chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow
         chmod -R 775 /opt/airflow/logs
 
-        # Switch to airflow user and run init commands
-        exec gosu "${AIRFLOW_UID:-50000}:0" bash -c "
+        # Run Airflow commands as airflow user
+        su -s /bin/bash "${AIRFLOW_UID:-50000}" -c "
           airflow db migrate &&
           airflow users create \
             --username airflow \
