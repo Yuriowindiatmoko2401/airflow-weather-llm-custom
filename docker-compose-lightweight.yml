@@ -119,17 +119,18 @@ services:
       - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
       - ~/.aws/:/home/airflow/.aws:ro
     user: "${AIRFLOW_UID:-50000}:0"
-    command: >
-      bash -c "
-        airflow db upgrade &&
-        airflow users create
-          --username airflow
-          --firstname Airflow
-          --lastname User
-          --role Admin
-          --email admin@example.com
-          --password airflow
-        || true"
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create \
+          --username airflow \
+          --firstname Airflow \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password airflow || true
     depends_on:
       airflow-metadata:
         condition: service_healthy
