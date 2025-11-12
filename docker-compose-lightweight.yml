@@ -118,19 +118,27 @@ services:
       - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
       - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
       - ~/.aws/:/home/airflow/.aws:ro
-    user: "${AIRFLOW_UID:-50000}:0"
+    user: "0:0"
     command:
       - bash
       - -c
       - |
-        airflow db migrate &&
-        airflow users create \
-          --username airflow \
-          --firstname Airflow \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com \
-          --password airflow || true
+        # Fix permissions for logs directory
+        mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/config /opt/airflow/plugins
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow
+        chmod -R 775 /opt/airflow/logs
+
+        # Switch to airflow user and run init commands
+        exec gosu "${AIRFLOW_UID:-50000}:0" bash -c "
+          airflow db migrate &&
+          airflow users create \
+            --username airflow \
+            --firstname Airflow \
+            --lastname User \
+            --role Admin \
+            --email admin@example.com \
+            --password airflow || true
+        "
     depends_on:
       airflow-metadata:
         condition: service_healthy
